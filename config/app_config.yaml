@@ -1,0 +1,200 @@
+# DharmaShield - Production Configuration
+app:
+  name: "DharmaShield"
+  version: "2.0.0"
+  debug: false
+  log_level: "INFO"
+  environment: "production"
+  data_dir: "data/"
+  cache_dir: "cache/"
+  
+logging:
+  level: "INFO"
+  format: "[%(asctime)s] %(levelname)s in %(module)s: %(message)s"
+  file: "logs/dharmashield.log"
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+  console: true
+
+voice_ui:
+  default_language: "en"
+  supported_languages:
+    - en    # English
+    - hi    # Hindi  
+    - es    # Spanish
+    - fr    # French
+    - de    # German
+    - zh    # Chinese
+    - ar    # Arabic
+    - ru    # Russian
+    - bn    # Bengali
+    - ur    # Urdu
+    - ta    # Tamil
+    - te    # Telugu
+    - mr    # Marathi
+    - pa    # Punjabi
+    - gu    # Gujarati
+  tts_rate: 170
+  tts_volume: 0.8
+  offline_asr_engine: "vosk"  # vosk | google | whisper | azure
+  voice_timeout: 10.0
+  enable_background_listening: false
+  noise_reduction: true
+  voice_activation_threshold: 0.5
+  
+models:
+  # Gemma model configuration
+  gemma_variant: "e2b"  # e2b | e4b | matformer
+  model_path: "models/"
+  enable_gpu: false
+  device: "cpu"  # cpu | cuda | mps
+  quantization: "int8"  # none | int8 | int4 | float16 | bfloat16
+  max_sequence_length: 2048
+  batch_size: 1
+  max_memory_gb: 8.0
+  
+  # Model files
+  e2b_model: "models/gemma3n_e2b.pth"
+  e4b_model: "models/gemma3n_e4b.pth"
+  matformer_model: "models/gemma3n_matformer.pth"
+  
+  # ASR models
+  vosk_models_dir: "models/vosk/"
+  vosk_model_urls:
+    en: "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22.zip"
+    hi: "https://alphacephei.com/vosk/models/vosk-model-hi-0.22.zip"
+    es: "https://alphacephei.com/vosk/models/vosk-model-es-0.22.zip"
+    fr: "https://alphacephei.com/vosk/models/vosk-model-fr-0.22.zip"
+    de: "https://alphacephei.com/vosk/models/vosk-model-de-0.22.zip"
+    
+security:
+  encryption_enabled: true
+  encryption_algorithm: "AES-256-GCM"
+  privacy_level: "high"  # minimal | standard | high | maximum
+  offline_only: true
+  audit_logging: true
+  secure_delete: true
+  key_rotation_interval: 86400  # 24 hours
+  network_isolation: true
+  memory_protection: true
+  
+ui:
+  theme: "dark"  # light | dark | auto
+  auto_theme: true
+  primary_color: "#1a1a2e"
+  accent_color: "#16213e"
+  text_color: "#ffffff"
+  animations: true
+  haptic_feedback: true
+  sound_effects: true
+  font_size: 16
+  font_family: "Roboto"
+  
+performance:
+  max_workers: 4
+  cache_enabled: true
+  cache_size_mb: 256
+  memory_limit_mb: 512
+  background_processing: true
+  preload_models: false
+  gpu_memory_fraction: 0.7
+  threading_enabled: true
+  async_processing: true
+  
+detection:
+  # Threat detection thresholds
+  threat_thresholds:
+    safe: 0.1
+    low: 0.3
+    medium: 0.6
+    high: 0.8
+    critical: 0.9
+    
+  # Detection modules
+  text_analysis: true
+  voice_analysis: true 
+  image_analysis: true
+  qr_analysis: true
+  document_analysis: true
+  url_analysis: true
+  
+  # ML model parameters
+  confidence_threshold: 0.75
+  ensemble_voting: true
+  anomaly_detection: true
+  behavioral_analysis: true
+  
+privacy:
+  data_classification: "confidential"  # public | internal | confidential | restricted
+  processing_location: "on_device"     # on_device | local_network | secure_cloud
+  policies:
+    - "strict_offline"
+    - "encrypted_only"  
+    - "audit_all"
+    - "zero_retention"
+  anonymization_technique: "differential_privacy"
+  k_anonymity: 5
+  l_diversity: 3
+  epsilon: 1.0
+  delta: 1e-5
+  
+audio:
+  sample_rate: 16000
+  channels: 1
+  chunk_size: 1024
+  format: "int16"
+  noise_reduction: true
+  echo_cancellation: true
+  auto_gain_control: true
+  
+networking:
+  timeout: 30
+  retries: 3
+  offline_mode: true
+  proxy_enabled: false
+  ssl_verify: true
+  user_agent: "DharmaShield/2.0.0"
+  
+storage:
+  database_path: "data/dharmashield.db" 
+  backup_enabled: true
+  backup_interval: 3600  # 1 hour
+  cleanup_interval: 86400  # 24 hours
+  max_log_size_mb: 100
+  
+features:
+  voice_commands: true
+  multi_language: true
+  offline_mode: true
+  real_time_analysis: true
+  batch_processing: false
+  api_integration: false
+  cloud_sync: false
+  
+platform:
+  android:
+    min_sdk: 23
+    target_sdk: 31
+    permissions:
+      - "RECORD_AUDIO"
+      - "CAMERA" 
+      - "WRITE_EXTERNAL_STORAGE"
+      - "READ_EXTERNAL_STORAGE"
+      - "INTERNET"
+      - "ACCESS_NETWORK_STATE"
+      - "VIBRATE"
+      - "WAKE_LOCK"
+  
+  ios:
+    min_version: "11.0"
+    target_version: "16.0"
+    privacy_descriptions:
+      microphone: "DharmaShield needs microphone access for voice commands and scam detection."
+      camera: "DharmaShield needs camera access for QR code and document scanning."
+      photo_library: "DharmaShield needs photo access to analyze images for scams."
+      
+  desktop:
+    min_ram_gb: 4
+    recommended_ram_gb: 8
+    storage_gb: 2
+    
