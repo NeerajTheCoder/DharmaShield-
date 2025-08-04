@@ -1,1 +1,121 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "🚀 DharmaShield - Main App",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/main.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "DHARMASHIELD_ENV": "development",
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "args": [],
+            "justMyCode": false
+        },
+        {
+            "name": "🎤 Voice UI - Debug Mode",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/main.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "DHARMASHIELD_ENV": "development",
+                "VOICE_DEBUG": "1",
+                "ASR_ENGINE": "vosk"
+            },
+            "args": ["--interface", "voice", "--language", "en"]
+        },
+        {
+            "name": "💬 CLI Interface",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/main.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "DHARMASHIELD_ENV": "development"
+            },
+            "args": ["--interface", "cli"]
+        },
+        {
+            "name": "🧪 Run All Tests",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PYTEST_CURRENT_TEST": "1"
+            },
+            "args": [
+                "tests/",
+                "-v",
+                "--tb=short",
+                "--cov=src",
+                "--cov-report=html",
+                "--cov-report=term-missing"
+            ]
+        },
+        {
+            "name": "🔍 Test Current File",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "args": [
+                "${file}",
+                "-v",
+                "--tb=short",
+                "-s"
+            ]
+        },
+        {
+            "name": "🤖 Model Manager Debug",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/core/model_manager.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "MODEL_DEBUG": "1"
+            },
+            "args": []
+        },
+        {
+            "name": "🛡️ Privacy Engine Test",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/core/privacy_engine.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PRIVACY_DEBUG": "1"
+            },
+            "args": []
+        },
+        {
+            "name": "📱 Buildozer Android Debug",
+            "type": "python",
+            "request": "launch",
+            "program": "/usr/local/bin/buildozer",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": ["android", "debug", "-v"]
+        }
+    ]
+}
 
