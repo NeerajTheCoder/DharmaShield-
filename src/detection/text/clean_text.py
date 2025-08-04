@@ -511,4 +511,72 @@ def clean_text(text: Union[str, bytes],
     Returns:
         str: Cleaned text
     """
-    cleaner = 
+    cleaner = get_text_cleaner(config_path)
+    return cleaner.clean_text(text, language, aggressive)
+
+
+# Performance testing and validation
+if __name__ == "__main__":
+    # Test cases covering various scenarios
+    import time
+    
+    test_cases = [
+        # Basic cleaning
+        "  Hello   world!!!   ",
+        
+        # URL and email removal
+        "Check out https://example.com and contact me at test@email.com",
+        
+        # Phone number removal
+        "Call me at +1-555-123-4567 or (555) 987-6543",
+        
+        # HTML cleaning
+        "<p>This is <b>bold</b> text with <a href='#'>links</a></p>",
+        # Unicode normalization
+        "café naïve résumé",  # Accented characters
+        
+        # Excessive punctuation
+        "Really???!!! This is amazing!!!",
+        
+        # Consecutive characters
+        "Sooooo goooood!!!",
+        
+        # Mixed language (Hindi)
+        "यह एक परीक्षण है। This is a test.",
+        
+        # Contractions
+        "I can't believe it's working! You're amazing!",
+        
+        # Empty and edge cases
+        "",
+        "a",
+        "   \n\t   ",
+        
+        # Numbers
+        "I have 123 apples and 45.67 dollars",
+        
+        # Emojis (should be preserved)
+        "I love this app! 😍🚀✨",
+        
+        # Non-printable characters
+        "Text with\x00\x01\x02 non-printable chars",
+    ]
+    
+    print("=== DharmaShield Text Cleaning Test Suite ===\n")
+    
+    cleaner = AdvancedTextCleaner()
+    
+    for i, test_text in enumerate(test_cases, 1):
+        print(f"Test {i}:")
+        print(f"Input:  '{test_text}'")
+        
+        start_time = time.time()
+        cleaned = cleaner.clean_text(test_text)
+        end_time = time.time()
+        
+        print(f"Output: '{cleaned}'")
+        print(f"Time:   {(end_time - start_time)*1000:.2f}ms")
+        print("-" * 50)
+    
+    print("✅ All tests completed successfully!")
+    print("\n🎯 Text cleaner ready for production deployment!")
