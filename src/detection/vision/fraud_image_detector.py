@@ -379,4 +379,3 @@ if __name__ == "__main__":
         print(f"  {k}: {v}")
     print("\n✅ All tests completed successfully!")
     print("🎯 Fraud Image Detector ready for production deployment!")
-  
