@@ -532,6 +532,7 @@ if __name__ == "__main__":
         
         # HTML cleaning
         "<p>This is <b>bold</b> text with <a href='#'>links</a></p>",
+        
         # Unicode normalization
         "café naïve résumé",  # Accented characters
         
