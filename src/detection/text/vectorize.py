@@ -9,7 +9,8 @@ This module provides industry-grade text vectorization capabilities optimized fo
 - Scam detection optimized feature extraction
 - Cross-platform mobile/desktop deployment ready
 
-
+Author: DharmaShield Team
+License: Open Source (Google Gemma 3n Competition Compatible)
 """
 
 import logging
@@ -686,4 +687,3 @@ if __name__ == "__main__":
         print("Vectorization test completed successfully!")
     else:
         print("Failed to initialize vectorizer")
-
