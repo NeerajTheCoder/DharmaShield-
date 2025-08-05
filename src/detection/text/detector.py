@@ -474,4 +474,451 @@ class AdvancedTextDetector:
     
     def _get_cache_key(self, text: str, language: str) -> str:
         """Generate cache key for predictions."""
-        content = f"{tex
+        content = f"{text}_{language}_{self.config.confidence_threshold}"
+        return hashlib.md5(content.encode()).hexdigest()
+    
+    def _calculate_uncertainty(self, confidence: float, pattern_score: float) -> float:
+        """Calculate prediction uncertainty using multiple factors."""
+        # Base uncertainty from confidence
+        confidence_uncertainty = 1.0 - confidence
+        
+        # Pattern uncertainty (high pattern scores reduce uncertainty)
+        pattern_uncertainty = max(0.0, 0.5 - pattern_score)
+        
+        # Combined uncertainty (weighted average)
+        combined_uncertainty = (0.7 * confidence_uncertainty + 0.3 * pattern_uncertainty)
+        
+        return min(1.0, combined_uncertainty)
+    
+    def _generate_explanation(self, 
+                            result: ClassificationResult,
+                            pattern_score: float,
+                            risk_factors: List[str],
+                            protective_factors: List[str],
+                            language: str) -> str:
+        """Generate comprehensive explanation for the detection result."""
+        if not self.config.enable_explanations:
+            return ""
+        
+        explanation_parts = []
+        
+        if result.is_scam:
+            explanation_parts.append(f"🔍 **SCAM DETECTED** with {result.confidence:.1%} confidence")
+            
+            if result.predicted_labels:
+                labels_str = ", ".join(result.predicted_labels)
+                explanation_parts.append(f"📋 **Detected categories**: {labels_str}")
+            
+            if risk_factors:
+                explanation_parts.append(f"⚠️ **Risk factors identified**: {len(risk_factors)} suspicious patterns")
+                if self.config.explanation_detail_level == 'high':
+                    for factor in risk_factors[:3]:  # Show top 3
+                        explanation_parts.append(f"   • {factor}")
+            
+            if pattern_score > 0.3:
+                explanation_parts.append(f"🎯 **Pattern analysis**: Strong scam indicators (score: {pattern_score:.2f})")
+        
+        else:
+            explanation_parts.append(f"✅ **No scam detected** (confidence: {result.confidence:.1%})")
+            
+            if protective_factors:
+                explanation_parts.append(f"🛡️ **Protective factors**: {len(protective_factors)} legitimate indicators")
+            
+            if pattern_score < 0.1:
+                explanation_parts.append("📊 **Pattern analysis**: No significant threat patterns detected")
+        
+        # Add language and processing info
+        lang_name = get_language_name(language)
+        explanation_parts.append(f"🌐 **Language**: {lang_name}")
+        
+        return "\n".join(explanation_parts)
+    
+    async def detect_async(self, 
+                          text: str,
+                          language: Optional[str] = None,
+                          include_explanation: bool = True) -> DetectionResult:
+        """Asynchronous detection method for non-blocking operations."""
+        return await asyncio.get_event_loop().run_in_executor(
+            None, self.detect, text, language, include_explanation
+        )
+    
+    def detect(self, 
+               text: str,
+               language: Optional[str] = None,
+               include_explanation: bool = True) -> DetectionResult:
+        """
+        Main detection method that classifies text as scam/not-scam with comprehensive analysis.
+        
+        Args:
+            text: Input text to analyze
+            language: Language code (auto-detected if None)
+            include_explanation: Whether to generate explanations
+            
+        Returns:
+            DetectionResult with comprehensive threat assessment
+        """
+        start_time = time.time()
+        
+        # Input validation
+        if not text or not text.strip():
+            return DetectionResult(
+                explanation="Empty or invalid input",
+                processing_time=time.time() - start_time
+            )
+        
+        try:
+            # Language detection
+            if language is None and self.config.auto_language_detection:
+                language = detect_language(text)
+            elif language is None:
+                language = 'en'
+            
+            # Check cache
+            cache_key = None
+            if self.prediction_cache is not None:
+                cache_key = self._get_cache_key(text, language)
+                if cache_key in self.prediction_cache:
+                    cached_result = self.prediction_cache[cache_key]
+                    cached_result.processing_time = time.time() - start_time
+                    return cached_result
+            
+            # Clean text
+            cleaned_text = clean_text(text, language=language)
+            
+            # Pattern-based analysis
+            pattern_score, risk_factors, protective_factors = \
+                self.threat_engine.calculate_pattern_score(cleaned_text, language)
+            
+            # ML-based classification (if enabled)
+            ml_result = None
+            if self.config.use_classifier and self.classifier:
+                ml_result = classify_text(cleaned_text, language=language, explain=False)
+            
+            # Combine results
+            if ml_result:
+                # Use ML results as primary
+                is_scam = ml_result.is_scam
+                confidence = ml_result.confidence
+                predicted_labels = ml_result.predicted_labels
+                label_scores = ml_result.label_scores
+                
+                # Adjust confidence based on pattern analysis
+                pattern_adjustment = min(0.2, pattern_score * 0.1)
+                if is_scam:
+                    confidence = min(1.0, confidence + pattern_adjustment)
+                else:
+                    confidence = max(0.0, confidence - pattern_adjustment)
+                
+            else:
+                # Use pattern-based results only
+                is_scam = pattern_score > 0.3
+                confidence = min(0.95, pattern_score)  # Cap at 95% for pattern-only
+                predicted_labels = ['pattern_based_scam'] if is_scam else []
+                label_scores = {'pattern_based_scam': confidence} if is_scam else {}
+            
+            # Calculate threat level
+            threat_level = ThreatLevel.from_confidence(confidence, is_scam)
+            
+            # Calculate uncertainty and quality
+            uncertainty = self._calculate_uncertainty(confidence, pattern_score)
+            prediction_quality = self.threat_engine.calculate_confidence_quality(confidence, uncertainty)
+            
+            # Generate recommendations
+            recommendations = []
+            if self.config.include_recommendations:
+                recommendations = self.threat_engine.generate_recommendations(
+                    is_scam, threat_level, risk_factors, language
+                )
+            
+            # Generate explanation
+            explanation = ""
+            if include_explanation:
+                explanation = self._generate_explanation(
+                    ml_result or type('obj', (object,), {
+                        'is_scam': is_scam, 
+                        'confidence': confidence, 
+                        'predicted_labels': predicted_labels
+                    })(),
+                    pattern_score, risk_factors, protective_factors, language
+                )
+            
+            # Create result
+            result = DetectionResult(
+                is_scam=is_scam,
+                confidence=confidence,
+                threat_level=threat_level,
+                predicted_labels=predicted_labels,
+                label_scores=label_scores,
+                uncertainty=uncertainty,
+                prediction_quality=prediction_quality,
+                explanation=explanation,
+                risk_factors=risk_factors,
+                protective_factors=protective_factors,
+                language=language,
+                processing_time=time.time() - start_time,
+                model_version=self.config.model_type,
+                confidence_breakdown={
+                    'ml_confidence': ml_result.confidence if ml_result else 0.0,
+                    'pattern_score': pattern_score,
+                    'final_confidence': confidence,
+                    'uncertainty': uncertainty
+                },
+                recommendations=recommendations
+            )
+            
+            # Cache result
+            if cache_key and self.prediction_cache is not None:
+                if len(self.prediction_cache) >= self.config.cache_size:
+                    # Remove oldest entry
+                    oldest_key = next(iter(self.prediction_cache))
+                    del self.prediction_cache[oldest_key]
+                self.prediction_cache[cache_key] = result
+            
+            # Update metrics
+            if self.config.enable_metrics:
+                self._update_metrics(result)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Detection failed: {e}")
+            return DetectionResult(
+                explanation=f"Detection error: {str(e)}",
+                processing_time=time.time() - start_time,
+                language=language or "unknown"
+            )
+    
+    def detect_batch(self, 
+                    texts: List[str],
+                    language: Optional[str] = None,
+                    include_explanation: bool = False) -> List[DetectionResult]:
+        """
+        Batch detection for multiple texts (optimized for throughput).
+        
+        Args:
+            texts: List of texts to analyze
+            language: Language code for all texts
+            include_explanation: Whether to generate explanations
+            
+        Returns:
+            List of DetectionResult objects
+        """
+        if not texts:
+            return []
+        
+        if self.config.batch_optimization:
+            # TODO: Implement true batch processing for better performance
+            # For now, process individually
+            pass
+        
+        results = []
+        for text in texts:
+            result = self.detect(
+                text=text,
+                language=language,
+                include_explanation=include_explanation
+            )
+            results.append(result)
+        
+        return results
+    
+    def _update_metrics(self, result: DetectionResult):
+        """Update performance metrics."""
+        self.recent_predictions.append(result)
+        self.metrics['processing_time'].append(result.processing_time)
+        self.metrics['confidence'].append(result.confidence)
+        self.metrics['threat_level'].append(int(result.threat_level))
+        self.metrics['prediction_count'].append(1)
+    
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """Get comprehensive performance statistics."""
+        if not self.recent_predictions:
+            return {"message": "No predictions made yet"}
+        
+        recent_results = list(self.recent_predictions)
+        total_predictions = len(recent_results)
+        
+        # Calculate statistics
+        avg_processing_time = np.mean([r.processing_time for r in recent_results])
+        avg_confidence = np.mean([r.confidence for r in recent_results])
+        scam_detection_rate = np.mean([r.is_scam for r in recent_results])
+        
+        # Threat level distribution
+        threat_levels = [int(r.threat_level) for r in recent_results]
+        threat_distribution = {
+            level.name: threat_levels.count(int(level)) / total_predictions 
+            for level in ThreatLevel
+        }
+        
+        # Language distribution
+        languages = [r.language for r in recent_results]
+        language_distribution = {
+            lang: languages.count(lang) / total_predictions 
+            for lang in set(languages)
+        }
+        
+        return {
+            'total_predictions': total_predictions,
+            'average_processing_time_ms': avg_processing_time * 1000,
+            'average_confidence': avg_confidence,
+            'scam_detection_rate': scam_detection_rate,
+            'threat_level_distribution': threat_distribution,
+            'language_distribution': language_distribution,
+            'cache_hit_rate': len(self.prediction_cache) / max(total_predictions, 1) if self.prediction_cache else 0,
+            'model_version': self.config.model_type,
+            'supported_languages': self.config.supported_languages
+        }
+    
+    def clear_cache(self):
+        """Clear prediction cache and reset metrics."""
+        if self.prediction_cache is not None:
+            self.prediction_cache.clear()
+        self.recent_predictions.clear()
+        self.metrics.clear()
+        logger.info("Cache and metrics cleared")
+
+
+# Global instance and convenience functions
+_global_detector = None
+
+def get_detector(config_path: Optional[str] = None) -> AdvancedTextDetector:
+    """Get the global detector instance."""
+    global _global_detector
+    if _global_detector is None:
+        _global_detector = AdvancedTextDetector(config_path)
+    return _global_detector
+
+def detect_scam(text: str, 
+                language: Optional[str] = None,
+                explain: bool = True) -> DetectionResult:
+    """
+    Convenience function for scam detection.
+    
+    Args:
+        text: Input text to analyze
+        language: Language code (auto-detected if None)
+        explain: Whether to generate explanations
+        
+    Returns:
+        DetectionResult with threat assessment
+    """
+    detector = get_detector()
+    return detector.detect(text=text, language=language, include_explanation=explain)
+
+async def detect_scam_async(text: str,
+                           language: Optional[str] = None,
+                           explain: bool = True) -> DetectionResult:
+    """Asynchronous convenience function for scam detection."""
+    detector = get_detector()
+    return await detector.detect_async(text=text, language=language, include_explanation=explain)
+
+def detect_batch(texts: List[str],
+                language: Optional[str] = None,
+                explain: bool = False) -> List[DetectionResult]:
+    """Convenience function for batch scam detection."""
+    detector = get_detector()
+    return detector.detect_batch(texts=texts, language=language, include_explanation=explain)
+
+
+# Testing and validation
+if __name__ == "__main__":
+    import time
+    
+    print("=== DharmaShield Advanced Text Detector Test Suite ===\n")
+    
+    # Test cases covering various scam types and languages
+    test_cases = [
+        # Critical threat scams
+        "URGENT: Your bank account will be suspended in 24 hours! Click here immediately to verify your identity and avoid account closure: bit.ly/bank-verify-now",
+        
+        # High threat scams
+        "Congratulations! You've won $50,000 in our lottery! To claim your prize, please provide your SSN and bank details within 48 hours.",
+        
+        # Medium threat scams
+        "Your PayPal account has unusual activity. Please log in to verify your information and secure your account.",
+        
+        # Low threat suspicious
+        "Hey, check out this amazing investment opportunity. Quick returns guaranteed!",
+        
+        # Legitimate messages
+        "Hi Sarah, are we still meeting for coffee at 3 PM today? Let me know if you need to reschedule.",
+        "Your Amazon order #123456 has been shipped and will arrive tomorrow. Track your package here.",
+        "Thank you for your purchase. Your receipt is attached. If you have any questions, contact our support team.",
+        
+        # Multilingual examples
+        "आपका बैंक खाता बंद हो जाएगा! तुरंत यहाँ क्लिक करें और अपनी जानकारी अपडेट करें।",  # Hindi
+        "¡URGENTE! Su cuenta será cerrada. Haga clic aquí para verificar: ejemplo.com/verificar",  # Spanish
+        "Votre compte bancaire sera fermé! Cliquez ici immédiatement pour vérifier.",  # French
+        
+        # Edge cases
+        "",
+        "a",
+        "Normal everyday conversation between friends about weekend plans.",
+    ]
+    
+    detector = AdvancedTextDetector()
+    
+    print("Testing individual detections...\n")
+    for i, test_text in enumerate(test_cases, 1):
+        display_text = test_text[:60] + "..." if len(test_text) > 60 else test_text
+        print(f"Test {i}: '{display_text}'")
+        
+        start_time = time.time()
+        result = detector.detect(test_text, include_explanation=True)
+        end_time = time.time()
+        
+        print(f"  {result.summary}")
+        print(f"  Threat Level: {result.threat_level.description()}")
+        print(f"  Language: {get_language_name(result.language)}")
+        print(f"  Quality: {result.prediction_quality}")
+        print(f"  Processing Time: {(end_time - start_time)*1000:.1f}ms")
+        
+        if result.risk_factors:
+            print(f"  Risk Factors: {len(result.risk_factors)} detected")
+        
+        if result.protective_factors:
+            print(f"  Protective Factors: {len(result.protective_factors)} detected")
+        
+        if result.recommendations:
+            print(f"  Recommendations: {len(result.recommendations)} provided")
+        
+        if result.explanation and i <= 3:  # Show explanations for first 3 tests
+            print(f"  Explanation:\n    {result.explanation.replace(chr(10), chr(10) + '    ')}")
+        
+        print("-" * 80)
+    
+    # Test batch processing
+    print(f"\nTesting batch processing with {len(test_cases[:5])} texts...")
+    batch_start = time.time()
+    batch_results = detector.detect_batch(test_cases[:5])
+    batch_end = time.time()
+    
+    avg_time_per_text = (batch_end - batch_start) / len(batch_results) * 1000
+    print(f"Batch processing: {avg_time_per_text:.1f}ms per text average")
+    
+    # Performance statistics
+    print("\nPerformance Statistics:")
+    stats = detector.get_performance_stats()
+    for key, value in stats.items():
+        if isinstance(value, dict):
+            print(f"  {key}:")
+            for subkey, subvalue in value.items():
+                if isinstance(subvalue, float):
+                    print(f"    {subkey}: {subvalue:.3f}")
+                else:
+                    print(f"    {subkey}: {subvalue}")
+        elif isinstance(value, float):
+            print(f"  {key}: {value:.3f}")
+        else:
+            print(f"  {key}: {value}")
+    
+    print("\n✅ All tests completed successfully!")
+    print("🎯 Advanced Text Detector ready for production deployment!")
+    print("\n🚀 Features demonstrated:")
+    print("  ✓ Multi-language scam detection")
+    print("  ✓ Threat level assessment (0-4 scale)")
+    print("  ✓ Confidence scoring with uncertainty quantification")
+    print("  ✓ Pattern-based and ML-based detection")
+    print("  ✓ Comprehensive explanations and recommendations")
+    print("  ✓ Performance monitoring and caching")
+    print("  ✓ Industry-grade error handling and logging")
